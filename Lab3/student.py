@@ -39,17 +39,26 @@ def student_producer(producer_num, f_in, buffer, locks):
 
         locks.producer_file_in.acquire() 
         line = f_in.readline()                                             # Read a line of data from f_in into the variable 'line'     
+        # print(f"nieh-1: producer-{producer_num} read {line.strip()}")
         locks.producer_file_in.release()
         
         if line == "": 
-            break
+            return
         try:              item  = int(line)                                # LINE P-1:  DO NOT CHANGE OR REORDER THIS LINE RELATIVE TO P-# LABELED LINES!  Turns the read input line into an integer 'item'
         except Exception: item  = 0                                        # LINE P-2:  DO NOT CHANGE OR REORDER THIS LINE RELATIVE TO P-# LABELED LINES!  If input item bad, sets to invalid.  With good code, this shouldn't happen.  (e.g., shouldn't try to use data beyond end of file)
-    
+        
+        
+        
+        locks.producer_buffer.acquire()
+
+
+
+        # wait consumer 
         while ((buffer.IN + 1) % buffer.NUM_SLOTS) == buffer.OUT :
             pass
         
-        locks.producer_buffer.acquire()
+     
+        # print(f"nieh-2: producer-{producer_num} item {item}")
         buffer.ITEMS[buffer.IN] = (item, producer_num)                     # LINE P-3:  DO NOT CHANGE OR REORDER THIS LINE RELATIVE TO P-# LABELED LINES!  Inserts a 2-part tuple into buffer.   
         buffer.IN = (buffer.IN + 1) % buffer.NUM_SLOTS
         locks.producer_buffer.release()
@@ -93,6 +102,7 @@ def student_consumer(consumer_num, f_out, buffer, locks):
         #   - You must appropriately use both consumer locks listed above to receive full credit.
         #
         # Please note: 
+
         #   - You must NOT use python 'with lock' statements.
         #   - You must use acquire() and release() explicitly.  That is, calls like:
         #          locks.consumer_buffer.acquire() 
@@ -100,26 +110,35 @@ def student_consumer(consumer_num, f_out, buffer, locks):
         #   - While you may add code in and around the labeled C-# lines below, do NOT edit or re-order the C-# lines.  
         #     Changes to those lines will break the tests and grading code.
 
-        try:              (item, producer_num) = buffer.ITEMS[buffer.OUT]          # LINE C-1:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Pulls a 2-part tuple out of buffer.
-        except Exception: (item, producer_num) = (0, 0)                            # LINE C-2:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Sets the tuple to 'invalid' info if bad data pulled from buffer.
-        
-        locks.consumer_file_out.acquire()         
-        f_out.write('%d\t%d\t%d\n' % (item, producer_num, consumer_num))           # LINE C-3:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Writes a 3-part 'tuple' (really, tab-separated data) to f_out.
-        locks.consumer_file_out.release() 
-        
-        if buffer.PRODUCERS_DONE and buffer.IN == buffer.OUT:
-            print("end")
-            break
-
-        while buffer.IN == buffer.OUT:
-            pass
         
         locks.consumer_buffer.acquire()
-        buffer.OUT = (buffer.OUT + 1) %  buffer.NUM_SLOTS                          
+        
+        while buffer.IN == buffer.OUT:                                             # Buffer empty, consumer wait
+            if buffer.PRODUCERS_DONE:
+                locks.consumer_buffer.release()
+                return
+
+        
+        try:              (item, producer_num) = buffer.ITEMS[buffer.OUT]          # LINE C-1:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Pulls a 2-part tuple out of buffer.
+        except Exception: (item, producer_num) = (0, 0)                            # LINE C-2:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Sets the tuple to 'invalid' info if bad data pulled from buffer.
+        print(f"nieh-3: consumer-{consumer_num} read {item}")
+
+        buffer.OUT = (buffer.OUT + 1) %  buffer.NUM_SLOTS       
+        
         locks.consumer_buffer.release()
+
+
+        locks.consumer_file_out.acquire()         
+        f_out.write('%d\t%d\t%d\n' % (item, producer_num, consumer_num))          # LINE C-3:  DO NOT CHANGE OR MOVE THIS LINE RELATIVE TO C-# LABELED LINES!  Writes a 3-part 'tuple' (really, tab-separated data) to f_out.
+        print(f"nieh-4: consumer-{consumer_num} write {item}")
+        locks.consumer_file_out.release()
+
+        # if buffer.PRODUCERS_DONE and buffer.IN == buffer.OUT:                     # Return if all producers finsihed
+        #     return
 
         # ------ PLACE YOUR CONSUMER CODE ABOVE THIS LINE ------
 
 
 # ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ 
+
 
